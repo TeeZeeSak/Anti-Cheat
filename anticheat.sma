@@ -311,7 +311,7 @@ public client_PreThink ( id )
 			new name [ 64 ], steamid [ 64 ], ip[ 32 ];
 			get_user_name ( id, name, charsmax(name) );
 			get_user_authid ( id, steamid, charsmax(steamid) );
-			get_user_ip( id, ip, charsmax(ip) - 1, 0);
+			get_user_ip( id, ip, charsmax(ip), 0);
 			if ( g_iGstrafeFog1 [ id ] >= 12 || g_iGstrafeFog2 [ id ] >= 12){
 				if(get_cvar_num("amxac_punish") == 1){
 					server_cmd("amx_slay %s", steamid);
