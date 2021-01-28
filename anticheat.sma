@@ -10,6 +10,10 @@
 #define VERSION "1.0"
 #define AUTHOR "chick"
 
+//test
+new File [ 256 ];
+//test
+
 new g_iFrames [ 33 ];
 
 //Fog1 Fog2 detecting ( 12+ Fog1 / 17+ Fog2 - bhop hack )
@@ -18,7 +22,7 @@ new g_iBhopFog2 [ 33 ];
 
 new m_iBhopFog1 [ 33 ];
 new m_iBhopFog2 [ 33 ];
-
+new m_iBhopTotalHops [ 33 ];
 // Gstrafe Fog
 new g_iGstrafeFog1 [ 33 ];
 new g_iGstrafeFog2 [ 33 ];
@@ -53,12 +57,17 @@ new amxac_punish;
 public plugin_init ( )
 {
 	register_plugin( PLUGIN , VERSION , AUTHOR );
+	
+	get_configsdir ( File, charsmax(File) );
+	format ( File, charsmax(File), "%s/test.cfg", File );
 		
 	register_clcmd ( "say /anticheat", "shmotd" );
 
 	register_forward(FM_CmdStart, "client_CmdStart")
 
 	amxac_punish = register_cvar("amxac_punish", "1");// 1 = slay; 2 = kick
+
+		
 }
 
 public client_connect(id){
@@ -75,7 +84,7 @@ public shmotd ( id )
 	len = format ( motd, 2047, "<html><head><meta charset='UTF-8'><h1 style='color: white;'>Anticheat sumarry</h1><style>body{font-family: 'Calibri';background-color:rgba(21,21,21,255);width:auto; }\
 	td {border-bottom: 1px #bbb solid;background-color: rgba(255,255,255,0.8);text-align: center; width:auto;}tr:nth-child(1){background-color: rgba(150,0,0,0.8);}tr:nth-child(even)\
 	{background-color: rgba(25,25,25,0.1);}table{border-spacing: 0;}</style></head><body><table style=^"width:100&#37;^">" );
-	len += format ( motd [len], 2047-len, "<tr><th>Nickname</th><th>SteamID</th><th>Perfect Hops</th><th>Semi-perfect Hops</th><th>Ratio</th><th>Detections</th></tr>" );
+	len += format ( motd [len], 2047-len, "<tr><th>Nickname</th><th>SteamID</th><th>Perfect Hops</th><th>Semi-perfect Hops</th><th>Total Hops</th><th>Ratio</th><th>Detections</th></tr>" );
 	
 	for(new i = 1; i <= 32; i++){
 		if(!is_user_connected(i) || is_user_bot(i))
@@ -83,7 +92,7 @@ public shmotd ( id )
 		new name[33], steamid[65];
 		get_user_name(id, name, sizeof(name) - 1);
 		get_user_authid(id, steamid, sizeof(steamid) - 1);
-		len += format ( motd [len], 2047-len, "<tr><td>%s</td><td>%s</td><td>%i</td><td>%i</td><td>%.1f%</td><td>%i</td></tr>", name, steamid, m_iBhopFog1[i], m_iBhopFog2[i], m_iBhopRatio[i], g_iDetections[i]);
+		len += format ( motd [len], 2047-len, "<tr><td>%s</td><td>%s</td><td>%i</td><td>%i</td><td>%i</td><td>%.1f%</td><td>%i</td></tr>", name, steamid, m_iBhopFog1[i], m_iBhopFog2[i], m_iBhopTotalHops[i], m_iBhopRatio[i], g_iDetections[i]);
 	}
 	len += format ( motd [len], 2047-len, "</table></body></html>" );
 	
@@ -207,13 +216,14 @@ public client_PreThink ( id )
 				g_iBhopFog1 [ id ] = 0;
 				g_iBhopFog2 [ id ] = 0;
 			}
-			
+			m_iBhopTotalHops[ id ]++;
 			//If perfect bhops are equal or more than 12 - result is probably bhop hack. At 15 Fog1 ( perfect bhops ) is 99,98% hack.
 			if (  g_iBhopFog1 [ id ] >= 12 || g_iBhopFog2 [ id ] >=17 ) {
-				new name [ 64 ], steamid [ 64 ];
+				new name [ 64 ], steamid [ 64 ], ip[ 32 ];
 				get_user_name ( id, name, charsmax(name) );
 				get_user_authid ( id, steamid, charsmax(steamid) );
-				
+				get_user_ip ( id, ip, charsmax(ip), 0 );
+
 				if ( g_iBhopFog1 [ id ] >= 12 || g_iBhopFog2 [ id ] >= 12){
 					if(get_cvar_num("amxac_punish") == 1){
 					server_cmd("amx_slay %s", steamid);
@@ -227,6 +237,8 @@ public client_PreThink ( id )
 
 					}
 					g_iDetections[id]++;
+					log_to_file("detections.log", "[%s - %s - %s] - got convinced for using bhop hack at %i (# of detections: %i, fog1: %i, fog2: %i, total: %i)", steamid, ip, name, get_systime(), g_iDetections[id], m_iBhopFog1[id], m_iBhopFog2[id], m_iBhopTotalHops[id]);
+
 				}
 
 			}
@@ -246,10 +258,10 @@ public client_PreThink ( id )
 				g_iBhopRatioFog3 [ id ]++;
 			
 			g_iBhopRatio [ id ] = g_iBhopRatioFog1 [ id ] + g_iBhopRatioFog2 [ id ] + g_iBhopRatioFog3 [ id ];
-			
+			m_iBhopRatio [ id ] = (g_iBhopRatioFog1 [ id ] + g_iBhopRatioFog2  [ id ] ) / float( g_iBhopRatio [ id ] ) * 100;
+
 			if ( g_iBhopRatio [ id ] == 60 ) {
 				g_Result = ( g_iBhopRatioFog1 [ id ] + g_iBhopRatioFog2  [ id ] ) / float( g_iBhopRatio [ id ] ) * 100;
-				m_iBhopRatio[id] = g_Result;
 				if ( g_Result >= 95 ) {
 					new name [ 32 ], steamid [ 32 ], ip [ 32 ];
 					get_user_name ( id, name, charsmax(name) );
@@ -266,7 +278,7 @@ public client_PreThink ( id )
 						ColorChat(0, "^3[^4Anti-Cheat^3]^1 %s (^4%s^1) is using bhop hack!", name, steamid);
 					}
 					g_iDetections[id]++;
-
+					log_to_file("detections.log", "[%s - %s - %s] - got convinced for using bhop hack at %i (# of detections: %i, ratio: %.1f)", steamid, ip, name, get_systime(), g_iDetections[id], m_iBhopRatio[id]);
 
 				}
 				g_iBhopRatioFog1 [ id ] = 0;
@@ -308,9 +320,12 @@ public client_PreThink ( id )
 				}
 				if(g_iLastMessage[id] + 60 <= get_systime()){
 					ColorChat(0, "^3[^4Anti-Cheat^3]^1 %s (^4%s^1) is using groundstrafe hack!", name, steamid);
+					g_iLastMessage[id] = get_systime();
 				}
 				g_iDetections[id]++;
-				g_iLastMessage[id] = get_systime();
+				log_to_file("detections.log", "[%s - %s - %s] - got convinced for using groundstrafe hack at %i (# of detections: %i, ratio: %.1f)", steamid, ip, name, get_systime(), g_iDetections[id], m_iBhopRatio[id]);
+
+
 
 			}
 					
@@ -382,3 +397,6 @@ stock ColorChat(const id, const input[], any:...)
         } 
     } 
 } 
+/* AMXX-Studio Notes - DO NOT MODIFY BELOW HERE
+*{\\ rtf1\\ ansi\\ deff0{\\ fonttbl{\\ f0\\ fnil Tahoma;}}\n\\ viewkind4\\ uc1\\ pard\\ lang1029\\ f0\\ fs16 \n\\ par }
+*/
