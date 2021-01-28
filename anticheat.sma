@@ -78,27 +78,32 @@ public client_connect(id){
 	g_iLastMessage[id] = 0;
 }
 
-public shmotd ( id )
+public shmotd ( id , level , cid )
 {
+	if ( !cmd_access ( id , level , cid , 2 ) )
+		return;
+	
 	new motd [ 2048 ], len;
 	len = format ( motd, 2047, "<html><head><meta charset='UTF-8'><h1 style='color: white;'>Anticheat sumarry</h1><style>body{font-family: 'Calibri';background-color:rgba(21,21,21,255);width:auto; }\
 	td {border-bottom: 1px #bbb solid;background-color: rgba(255,255,255,0.8);text-align: center; width:auto;}tr:nth-child(1){background-color: rgba(150,0,0,0.8);}tr:nth-child(even)\
 	{background-color: rgba(25,25,25,0.1);}table{border-spacing: 0;}</style></head><body><table style=^"width:100&#37;^">" );
 	len += format ( motd [len], 2047-len, "<tr><th>Nickname</th><th>SteamID</th><th>Perfect Hops</th><th>Semi-perfect Hops</th><th>Total Hops</th><th>Ratio</th><th>Detections</th></tr>" );
 	
-	for(new i = 1; i <= 32; i++){
-		if(!is_user_connected(i) || is_user_bot(i))
-			continue;
+	new players [32] , pnum , tempid;
+	get_players ( players, pnum );
+	
+	for( new i;i<pnum;i++ )
+	{
 		new name[33], steamid[65];
-		get_user_name(id, name, sizeof(name) - 1);
-		get_user_authid(id, steamid, sizeof(steamid) - 1);
-		len += format ( motd [len], 2047-len, "<tr><td>%s</td><td>%s</td><td>%i</td><td>%i</td><td>%i</td><td>%.1f%</td><td>%i</td></tr>", name, steamid, m_iBhopFog1[i], m_iBhopFog2[i], m_iBhopTotalHops[i], m_iBhopRatio[i], g_iDetections[i]);
+		tempid = players [i];
+		get_user_name ( tempid, name, sizeof(name) - 1 ) ;
+		get_user_authid ( tempid, steamid, sizeof(steamid) - 1 ) ;
+		len += format ( motd [len], 2047-len, "<tr><td>%s</td><td>%s</td><td>%i</td><td>%i</td><td>%i</td><td>%.1f%</td><td>%i</td></tr>", name, steamid, m_iBhopFog1[tempid], m_iBhopFog2[tempid], m_iBhopTotalHops[tempid], m_iBhopRatio[tempid], g_iDetections[tempid]);
 	}
 	len += format ( motd [len], 2047-len, "</table></body></html>" );
 	
 	show_motd ( id, motd, "Cheaters" );
 }
-
 
 public client_CmdStart(id, uc)
 {
