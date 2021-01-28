@@ -13,3 +13,6 @@ Scope:
 TBA:
 - norecoil
 - speedhack
+
+
+![Cheaters page](https://i.imgur.com/T1ycqlN.jpg)
