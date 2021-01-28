@@ -10,10 +10,6 @@
 #define VERSION "1.0"
 #define AUTHOR "chick"
 
-//test
-new File [ 256 ];
-//test
-
 new g_iFrames [ 33 ];
 
 //Fog1 Fog2 detecting ( 12+ Fog1 / 17+ Fog2 - bhop hack )
@@ -53,21 +49,27 @@ new g_iLastMessage[33]
 //Punishment cvar
 new amxac_punish;
 
+//Freeze time
+//new bool:g_bFreezeTime;
 
 public plugin_init ( )
 {
 	register_plugin( PLUGIN , VERSION , AUTHOR );
-	
-	get_configsdir ( File, charsmax(File) );
-	format ( File, charsmax(File), "%s/test.cfg", File );
 		
-	register_clcmd ( "say /anticheat", "shmotd" );
-
+	register_clcmd ( "say /anticheat", "shmotd" , ADMIN_BAN );
+	register_concmd ( "wait" , "hookWait" );
+	
 	register_forward(FM_CmdStart, "client_CmdStart")
 
-	amxac_punish = register_cvar("amxac_punish", "1");// 1 = slay; 2 = kick
+	amxac_punish = register_cvar("amxac_punish", "1");// 1 = slay; 2 = kick	
+}
 
-		
+public hookWait ( id )
+{
+	new name [32];
+	get_user_name ( id , name , charsmax(name) );
+	client_print ( 0 , print_chat , "Player %s is using command wait!" );
+	return;
 }
 
 public client_connect(id){
@@ -125,13 +127,14 @@ public client_CmdStart(id, uc)
 		
 		checkFastRun(id, playerSpeed, flSpeed);
 		
-		checkStrafeHack(id, playerSpeed, flSpeed);
-		
+		if ( playerSpeed > 15.0 )
+			checkStrafeHack(id, playerSpeed, flSpeed);
 	}
 } 
 
 
-public checkStrafeHack(id, Float:playerSpeed, Float:flSpeed){
+public checkStrafeHack(id, Float:playerSpeed, Float:flSpeed)
+{
 	if(!(get_entity_flags(id) & FL_ONGROUND)){
 		if(flSideMove[id] * 1 > playerSpeed){
 			if((flForwardMove[id] * 1) < 100){
@@ -313,10 +316,10 @@ public client_PreThink ( id )
 		}
 			
 		if (  g_iGstrafeFog1 [ id ] >= 12 || g_iGstrafeFog2 [ id ] >=17 ) {
-			new name [ 64 ], steamid [ 64 ], ip[ 32 ];
+			new name [ 64 ], steamid [ 64 ], ip [64];
 			get_user_name ( id, name, charsmax(name) );
 			get_user_authid ( id, steamid, charsmax(steamid) );
-			get_user_ip( id, ip, charsmax(ip), 0);
+			
 			if ( g_iGstrafeFog1 [ id ] >= 12 || g_iGstrafeFog2 [ id ] >= 12){
 				if(get_cvar_num("amxac_punish") == 1){
 					server_cmd("amx_slay %s", steamid);
@@ -353,7 +356,8 @@ public client_PreThink ( id )
 		if ( g_iGstrafeRatio [ id ] == 60 ) {
 			g_Result = ( g_iGstrafeRatioFog1 [ id ] + g_iGstrafeRatioFog2  [ id ] ) / float( g_iGstrafeRatio [ id ] ) * 100;
 				
-			if ( g_Result >= 95 ) {
+			if ( g_Result >= 95 )
+			{
 				new name [ 32 ], steamid [ 32 ], ip [ 32 ];
 				get_user_name ( id, name, charsmax(name) );
 				get_user_authid ( id, steamid, charsmax(steamid) );
@@ -370,12 +374,12 @@ public client_PreThink ( id )
 				g_iDetections[id]++;
 
 
+				}
+				g_iGstrafeRatioFog1 [ id ] = 0;
+				g_iGstrafeRatioFog2 [ id ] = 0;
+				g_iGstrafeRatioFog3 [ id ] = 0;
 			}
-			g_iGstrafeRatioFog1 [ id ] = 0;
-			g_iGstrafeRatioFog2 [ id ] = 0;
-			g_iGstrafeRatioFog3 [ id ] = 0;
 		}
-	}
 }
 
 stock ColorChat(const id, const input[], any:...) 
@@ -402,3 +406,6 @@ stock ColorChat(const id, const input[], any:...)
         } 
     } 
 } 
+/* AMXX-Studio Notes - DO NOT MODIFY BELOW HERE
+*{\\ rtf1\\ ansi\\ deff0{\\ fonttbl{\\ f0\\ fnil Tahoma;}}\n\\ viewkind4\\ uc1\\ pard\\ lang1029\\ f0\\ fs16 \n\\ par }
+*/
