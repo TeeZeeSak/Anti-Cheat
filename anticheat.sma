@@ -57,19 +57,10 @@ public plugin_init ( )
 	register_plugin( PLUGIN , VERSION , AUTHOR );
 		
 	register_clcmd ( "say /anticheat", "shmotd" , ADMIN_BAN );
-	register_concmd ( "wait" , "hookWait" );
 	
 	register_forward(FM_CmdStart, "client_CmdStart")
 
 	amxac_punish = register_cvar("amxac_punish", "1");// 1 = slay; 2 = kick	
-}
-
-public hookWait ( id )
-{
-	new name [32];
-	get_user_name ( id , name , charsmax(name) );
-	client_print ( 0 , print_chat , "Player %s is using command wait!" );
-	return;
 }
 
 public client_connect(id){
