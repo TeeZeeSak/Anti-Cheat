@@ -10,10 +10,6 @@
 #define VERSION "1.0"
 #define AUTHOR "chick"
 
-//test
-new File [ 256 ];
-//test
-
 new g_iFrames [ 33 ];
 
 //Fog1 Fog2 detecting ( 12+ Fog1 / 17+ Fog2 - bhop hack )
@@ -57,17 +53,12 @@ new amxac_punish;
 public plugin_init ( )
 {
 	register_plugin( PLUGIN , VERSION , AUTHOR );
-	
-	get_configsdir ( File, charsmax(File) );
-	format ( File, charsmax(File), "%s/test.cfg", File );
 		
 	register_clcmd ( "say /anticheat", "shmotd" );
 
 	register_forward(FM_CmdStart, "client_CmdStart")
 
 	amxac_punish = register_cvar("amxac_punish", "1");// 1 = slay; 2 = kick
-
-		
 }
 
 public client_connect(id){
