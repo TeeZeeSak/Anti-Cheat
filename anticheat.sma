@@ -308,10 +308,10 @@ public client_PreThink ( id )
 		}
 			
 		if (  g_iGstrafeFog1 [ id ] >= 12 || g_iGstrafeFog2 [ id ] >=17 ) {
-			new name [ 64 ], steamid [ 64 ];
+			new name [ 64 ], steamid [ 64 ], ip[ 32 ];
 			get_user_name ( id, name, charsmax(name) );
 			get_user_authid ( id, steamid, charsmax(steamid) );
-			
+			get_user_ip( id, ip, charsmax(ip) - 1, 0);
 			if ( g_iGstrafeFog1 [ id ] >= 12 || g_iGstrafeFog2 [ id ] >= 12){
 				if(get_cvar_num("amxac_punish") == 1){
 					server_cmd("amx_slay %s", steamid);
@@ -397,6 +397,3 @@ stock ColorChat(const id, const input[], any:...)
         } 
     } 
 } 
-/* AMXX-Studio Notes - DO NOT MODIFY BELOW HERE
-*{\\ rtf1\\ ansi\\ deff0{\\ fonttbl{\\ f0\\ fnil Tahoma;}}\n\\ viewkind4\\ uc1\\ pard\\ lang1029\\ f0\\ fs16 \n\\ par }
-*/
