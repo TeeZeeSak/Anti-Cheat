@@ -20,6 +20,9 @@ new g_iFrames [ 33 ];
 new g_iBhopFog1 [ 33 ];
 new g_iBhopFog2 [ 33 ];
 
+new m_iBhopFog1 [ 33 ];
+new m_iBhopFog2 [ 33 ];
+
 // Gstrafe Fog
 new g_iGstrafeFog1 [ 33 ];
 new g_iGstrafeFog2 [ 33 ];
@@ -30,6 +33,7 @@ new g_iBhopRatioFog1 [ 33 ];
 new g_iBhopRatioFog2 [ 33 ];
 new g_iBhopRatioFog3 [ 33 ];
 new g_iBhopRatio [ 33 ];
+new Float:m_iBhopRatio [ 33 ];
 
 //Detecting by ratio
 new g_iGstrafeRatioFog1 [ 33 ];
@@ -56,49 +60,39 @@ public plugin_init ( )
 	
 	get_configsdir ( File, charsmax(File) );
 	format ( File, charsmax(File), "%s/test.cfg", File );
-	
-	register_clcmd ( "say /savefog", "funcSaveFog" );
-	register_clcmd ( "say /readfog", "funcReadFog" );
-	
+		
 	register_clcmd ( "say /anticheat", "shmotd" );
-	
+
+	register_forward(FM_CmdStart, "client_CmdStart")
+
 	amxac_punish = register_cvar("amxac_punish", "1");// 1 = slay; 2 = kick
+
 		
 }
 
-public funcSaveFog ( id )
-{
-	new write [ 128 ];
-	new steamid [ 32 ], name [ 32 ];
-	new Float:ratio = (g_iGstrafeRatioFog1[id] + g_iGstrafeRatioFog2 [id])  / float( g_iGstrafeRatio [ id ] ) * 100;
-	get_user_authid ( id, steamid, 31 );
-	get_user_name ( id, name, 31 );
-	
-	new f = fopen ( File, "a+" );
-	
-	if ( f )
-	{
-		formatex ( write, 127, "%s %s %i %i %i %.1f %i^n", name, steamid, g_iBhopRatioFog1 [ id ], g_iBhopRatioFog2 [ id ], g_iBhopRatioFog3 [ id ], ratio, g_iDetections[id]);
-			
-		fputs ( f, write );
-		fclose ( f );
-	}
+public client_connect(id){
+	m_iBhopFog1[id] = 0;
+	m_iBhopFog2[id] = 0;
+	m_iBhopRatio[id] = 0.0;
+	g_iDetections[id] = 0;
+	g_iLastMessage[id] = 0;
 }
 
 public shmotd ( id )
 {
 	new motd [ 2048 ], len;
-	len = format ( motd, 2047, "<html><head><h1>Anticheat sumarry</h1><style>body{font-family: 'Calibri';}td {border-bottom: 1px #bbb solid;background-color: rgba(0,0,0,0.1);text-align: center;}tr:nth-child(1){background-color: rgba(255,0,0,0.5);}tr:nth-child(even){background-color: rgba(25,25,25,0.1);}table{width: 100%;border-spacing: 0;}</style></head><body><table>" );
-	len += format ( motd [len], 2047-len, "<tr><th>Nickname</th><th>SteamID</th><th>Perfect Hops</th><th>Semi-perfect Hops</th><th>Failed Hops</th><th>Ratio</th><th>Detections</th></tr>" );
+	len = format ( motd, 2047, "<html><head><meta charset='UTF-8'><h1 style='color: white;'>Anticheat sumarry</h1><style>body{font-family: 'Calibri';background-color:rgba(21,21,21,255);width:auto; }\
+	td {border-bottom: 1px #bbb solid;background-color: rgba(255,255,255,0.8);text-align: center; width:auto;}tr:nth-child(1){background-color: rgba(150,0,0,0.8);}tr:nth-child(even)\
+	{background-color: rgba(25,25,25,0.1);}table{border-spacing: 0;}</style></head><body><table style=^"width:100&#37;^">" );
+	len += format ( motd [len], 2047-len, "<tr><th>Nickname</th><th>SteamID</th><th>Perfect Hops</th><th>Semi-perfect Hops</th><th>Ratio</th><th>Detections</th></tr>" );
 	
-	new f = fopen ( File, "r" );
-	new read [ 256 ];
-	
-	while ( fgets (f, read, 255) )
-	{
-		new name [ 32 ], sid [ 32 ], fog1 [ 3 ], fog2 [ 3 ], fog3 [ 3 ], ratio[4], detections[3];
-		parse ( read, name, 31, sid, 31, fog1, 2, fog2, 2, fog3, 2, ratio, 3, detections, 2 );
-		len += format ( motd [len], 2047-len, "<tr><td>%s</td><td>%s</td><td>%i</td><td>%i</td><td>%i</td><td>%.1f%</td><td>%i</td></tr>", name, sid, fog1, fog2, fog3, ratio, detections );
+	for(new i = 1; i <= 32; i++){
+		if(!is_user_connected(i) || is_user_bot(i))
+			continue;
+		new name[33], steamid[65];
+		get_user_name(id, name, sizeof(name) - 1);
+		get_user_authid(id, steamid, sizeof(steamid) - 1);
+		len += format ( motd [len], 2047-len, "<tr><td>%s</td><td>%s</td><td>%i</td><td>%i</td><td>%.1f%</td><td>%i</td></tr>", name, steamid, m_iBhopFog1[i], m_iBhopFog2[i], m_iBhopRatio[i], g_iDetections[i]);
 	}
 	len += format ( motd [len], 2047-len, "</table></body></html>" );
 	
@@ -148,7 +142,7 @@ public checkStrafeHack(id, Float:playerSpeed, Float:flSpeed){
 					server_cmd("amx_kick %s ^"Cheat detected!^"", szSteamId);
 				}
 				
-				if(g_iLastMessage[id] + 60 >= get_systime()){
+				if(g_iLastMessage[id] + 60 <= get_systime()){
 					
 					ColorChat(0, "^3[^4Anti-Cheat^3]^1 %s (^4%s^1) is using strafehack!", szUserName, szSteamId);
 					g_iLastMessage[id] = get_systime();
@@ -175,7 +169,7 @@ public checkFastRun(id, Float:playerSpeed, Float:flSpeed){
 					server_cmd("amx_kick %s ^"Cheat detected!^"", szSteamId);
 			}
 			
-			if(g_iLastMessage[id] + 60 >= get_systime()){
+			if(g_iLastMessage[id] + 60 <= get_systime()){
 				
 				ColorChat(0, "^3[^4Anti-Cheat^3]^1 %s (^4%s^1) is using fastrun hack!", szUserName, szSteamId);
 				g_iLastMessage[id] = get_systime();
@@ -209,10 +203,14 @@ public client_PreThink ( id )
 			{
 				g_iBhopFog2 [ id ] = 0;
 				g_iBhopFog1 [ id ]++;
+				m_iBhopFog1 [ id ]++;
+
 			} else if ( ( g_iFrames[ id ] == 2 && speed < 400.0 ) )
 			{
 				g_iBhopFog1 [ id ] = 0;
 				g_iBhopFog2 [ id ]++;
+				m_iBhopFog2 [ id ]++;
+
 			} else
 			{
 				g_iBhopFog1 [ id ] = 0;
@@ -226,13 +224,13 @@ public client_PreThink ( id )
 				get_user_authid ( id, steamid, charsmax(steamid) );
 				
 				if ( g_iBhopFog1 [ id ] >= 12 || g_iBhopFog2 [ id ] >= 12){
-					if(get_pcvar_num(amxac_punish) == 1){
+					if(get_cvar_num("amxac_punish") == 1){
 					server_cmd("amx_slay %s", steamid);
 					}else if(get_pcvar_num(amxac_punish) == 2){
 						server_cmd("amx_kick %s ^"Cheat detected!^"", steamid);
 					}
 				
-					if(g_iLastMessage[id] + 60 >= get_systime()){
+					if(g_iLastMessage[id] + 60 <= get_systime()){
 						ColorChat(0, "^3[^4Anti-Cheat^3]^1 %s (^4%s^1) is using bhop hack!", name, steamid);
 						g_iLastMessage[id] = get_systime();
 
@@ -260,7 +258,7 @@ public client_PreThink ( id )
 			
 			if ( g_iBhopRatio [ id ] == 60 ) {
 				g_Result = ( g_iBhopRatioFog1 [ id ] + g_iBhopRatioFog2  [ id ] ) / float( g_iBhopRatio [ id ] ) * 100;
-				
+				m_iBhopRatio[id] = g_Result;
 				if ( g_Result >= 95 ) {
 					new name [ 32 ], steamid [ 32 ], ip [ 32 ];
 					get_user_name ( id, name, charsmax(name) );
@@ -268,11 +266,11 @@ public client_PreThink ( id )
 					get_user_ip ( id, ip, charsmax(ip), 0 );
 					if(get_pcvar_num(amxac_punish) == 1){
 					server_cmd("amx_slay %s", steamid);
-					}else if(get_pcvar_num(amxac_punish) == 2){
+					}else if(get_cvar_num("amxac_punish") == 2){
 						server_cmd("amx_kick %s ^"Cheat detected!^"", steamid);
 					}
 				
-					if(g_iLastMessage[id] + 60 >= get_systime()){
+					if(g_iLastMessage[id] + 60 <= get_systime()){
 						g_iLastMessage[id] = get_systime();
 						ColorChat(0, "^3[^4Anti-Cheat^3]^1 %s (^4%s^1) is using bhop hack!", name, steamid);
 					}
@@ -312,7 +310,12 @@ public client_PreThink ( id )
 			get_user_authid ( id, steamid, charsmax(steamid) );
 			
 			if ( g_iGstrafeFog1 [ id ] >= 12 || g_iGstrafeFog2 [ id ] >= 12){
-				if(g_iLastMessage[id] + 60 >= get_systime()){
+				if(get_cvar_num("amxac_punish") == 1){
+					server_cmd("amx_slay %s", steamid);
+				}else if(get_pcvar_num(amxac_punish) == 2){
+					server_cmd("amx_kick %s ^"Cheat detected!^"", steamid);
+				}
+				if(g_iLastMessage[id] + 60 <= get_systime()){
 					ColorChat(0, "^3[^4Anti-Cheat^3]^1 %s (^4%s^1) is using groundstrafe hack!", name, steamid);
 				}
 				g_iDetections[id]++;
@@ -344,7 +347,12 @@ public client_PreThink ( id )
 				get_user_name ( id, name, charsmax(name) );
 				get_user_authid ( id, steamid, charsmax(steamid) );
 				get_user_ip ( id, ip, charsmax(ip), 0 );
-				if(g_iLastMessage[id] + 60 >= get_systime()){
+				if(get_cvar_num("amxac_punish") == 1){
+					server_cmd("amx_slay %s", steamid);
+				}else if(get_pcvar_num(amxac_punish) == 2){
+					server_cmd("amx_kick %s ^"Cheat detected!^"", steamid);
+				}
+				if(g_iLastMessage[id] + 60 <= get_systime()){
 					ColorChat(0, "^3[^4Anti-Cheat^3]^1 %s (^4%s^1) is using groundstrafe hack!", name, steamid);
 					g_iLastMessage[id] = get_systime();
 				}
@@ -383,6 +391,3 @@ stock ColorChat(const id, const input[], any:...)
         } 
     } 
 } 
-/* AMXX-Studio Notes - DO NOT MODIFY BELOW HERE
-*{\\ rtf1\\ ansi\\ deff0{\\ fonttbl{\\ f0\\ fnil Tahoma;}}\n\\ viewkind4\\ uc1\\ pard\\ lang1029\\ f0\\ fs16 \n\\ par }
-*/
