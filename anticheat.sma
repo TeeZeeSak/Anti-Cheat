@@ -50,7 +50,6 @@ public plugin_init()
 	//MOTD for ADMIN_BAN
 	register_clcmd ( "say /anticheat" , "fwMotd" , ADMIN_BAN );
 	//End
-
 	ac_punish = register_cvar( "ac_punish" , "1" ); //Slay - 1 || Kick - 2 || Default is 1
 }
 
@@ -147,81 +146,67 @@ public client_PreThink ( id )
 					if ( flRatio >= 95.0 )
 						{
 							if ( !g_bIsUserHacking [ id ] ) g_bIsUserHacking [ id ] = true;
+							//Log
 							if ( g_iLastLogMessage [ id ]+60 >= get_systime() )
 							{
 								new szName [ 32 ] , szSteamId [ 32 ];
 								get_user_name ( id , szName , charsmax(szName) );
 								get_user_authid ( id , szSteamId , charsmax(szSteamId) );
 								log_to_file( "anticheat_log.log" , "[Anticheat] Player %s (%s) used bhop hack. (Big ratio of perfect/semi-perfect bhops = %.2f)" , szName , szSteamId , flRatio );
-								g_iLastLogMessage [ id ] = get_systime();
+								g_iLastLogMessage [ id ] = get_systime ();
 							}
 						}
 					g_iTotalBhops [ id ] = 0;
 				}
 			//End
 
-			//Punish if hacking!
-			//PERFECT bhops
-			if ( g_iPerfectBhop [ id ] >= MAXPERFECT && is_user_connected ( id ) && is_user_alive ( id ) )
+			//Detect if player reached MAXPERFECT ( 12 ) perfect bhops.
+			if ( g_iPerfectBhop [ id ] >= MAXPERFECT )
+				{
+					if ( !g_bIsUserHacking [ id ] ) g_bIsUserHacking [ id ] = true;
+					if ( g_iLastLogMessage [id]+300 <= get_systime() )
+						{
+							new szName [ 32 ] , szSteamId [ 32 ];
+							get_user_name ( id , szName , charsmax(szName) );
+							get_user_authid ( id , szSteamId , charsmax(szSteamId) );
+							log_to_file( "anticheat_log.log" , "[Anticheat] Player %s (%s) used bhop hack. (Perfect bhop)" , szName , szSteamId );
+							g_iLastChatMessage [ id ] = get_systime ();
+						}
+				}
+			//Detect if player reached MAXSEMIPERFECT ( 17 ) perfect bhops.
+			if ( g_iSemiPerfectBhop [ id ] >= MAXSEMIPERFECT )
+				{
+					if ( !g_bIsUserHacking [ id ] ) g_bIsUserHacking [ id ] = true;
+					if ( g_iLastLogMessage [id]+300 <= get_systime() )
+					{
+						new szName [ 32 ] , szSteamId [ 32 ];
+						get_user_name ( id , szName , charsmax(szName) );
+						get_user_authid ( id , szSteamId , charsmax(szSteamId) );
+						log_to_file( "anticheat_log.log" , "[Anticheat] Player %s (%s) used bhop hack." , szName , szSteamId );
+						g_iLastChatMessage [ id ] = get_systime ();
+					}
+				}
+			//End detecting
+
+			//Punish if bool hacking is true
+			if ( g_bIsUserHacking [ id ] )
 				{
 					new szName [ 32 ] , szSteamId [ 32 ];
 					get_user_name ( id , szName , charsmax(szName) );
 					get_user_authid ( id , szSteamId , charsmax(szSteamId) );
 
-					if ( get_pcvar_num ( ac_punish ) == 1 )
-						{
-							server_cmd ( "amx_slay %s" , szSteamId );
-							if ( g_iLastChatMessage [id]+60 <= get_systime() )
-							{
-								ColorChat ( 0 , "^1[^4Anticheat^1] Player ^4%s ^1(^4%s^1) is using bhop hack! Slaying.." , szName , szSteamId );
-								log_to_file( "anticheat_log.log" , "[Anticheat] Player %s (%s) used bhop hack. (Perfect bhop)" , szName , szSteamId );
-								g_iLastChatMessage [ id ] = get_systime ();
-							}
-						}
-					else if ( get_pcvar_num ( ac_punish ) == 2 )
-						{
-							server_cmd ( "amx_kick %s" , szSteamId );
-							if ( g_iLastChatMessage [id]+60 <= get_systime() )
-							{
-								ColorChat ( 0 , "^1[^4Anticheat^1] Player ^4%s ^1(^4%s^1) is using bhop hack! Kicking.." , szName , szSteamId );
-								log_to_file( "anticheat_log.log" , "[Anticheat] Player %s (%s) used bhop hack. (Perfect bhop)" , szName , szSteamId );
-								g_iLastChatMessage [ id ] = get_systime ();
-							}
-						}
+					if ( get_pcvar_num (ac_punish) == 1 )
+					{
+						server_cmd ( "amx_slay %s" , szSteamId );
+						ColorChat( 0 , "^1[^4Anti-cheat^1] Player ^4%s^1 (^4%s^1) is using bhop hack! Slaying.." , szName , szSteamId );
+					}
+					if ( get_pcvar_num (ac_punish) == 2 )
+					{
+						server_cmd ( "amx_kick %s" , szSteamId );
+						ColorChat( 0 , "^1[^4Anti-cheat^1] Player ^4%s^1 (^4%s^1) is using bhop hack! Slaying.." , szName , szSteamId );
+					}
 				}
-			//SEMIPERFECT bhops
-			if ( g_iSemiPerfectBhop [ id ] >= MAXSEMIPERFECT && is_user_connected ( id ) && is_user_alive ( id ) )
-				{
-					new szName [ 32 ] , szSteamId [ 32 ];
-					get_user_name ( id , szName , charsmax(szName) );
-					get_user_authid ( id , szSteamId , charsmax(szSteamId) );
-
-					log_to_file( "anticheat_log.log" , "[Anticheat] Player %s (%s) used bhop hack." , szName , szSteamId );
-
-					if ( get_pcvar_num ( ac_punish ) == 1 )
-						{
-							server_cmd ( "amx_slay %s" , szSteamId );
-							if ( g_iLastChatMessage [id]+60 <= get_systime() )
-							{
-								ColorChat ( 0 , "^1[^4Anticheat^1] Player ^4%s ^1(^4%s^1) is using bhop hack! Slaying.." , szName , szSteamId );
-								log_to_file( "anticheat_log.log" , "[Anticheat] Player %s (%s) used bhop hack. (Semi-perfect bhop)" , szName , szSteamId );
-								g_iLastChatMessage [ id ] = get_systime ();
-							}
-						}
-					else if ( get_pcvar_num ( ac_punish ) == 2 )
-						{
-							server_cmd ( "amx_kick %s" , szSteamId );
-							if ( g_iLastChatMessage [id]+60 <= get_systime() )
-							{
-								ColorChat ( 0 , "^1[^4Anticheat^1] Player ^4%s ^1(^4%s^1) is using bhop hack! Kicking.." , szName , szSteamId );
-								log_to_file( "anticheat_log.log" , "[Anticheat] Player %s (%s) used bhop hack. (Semi-perfect bhop)" , szName , szSteamId );
-								g_iLastChatMessage [ id ] = get_systime ();
-							}
-						}
-				}
-			//End punishing
 		}
-	//End detecting
 }
 
 stock ColorChat(const id, const input[], any:...) 
@@ -247,4 +232,4 @@ stock ColorChat(const id, const input[], any:...)
             } 
         } 
     } 
-}
+} 
