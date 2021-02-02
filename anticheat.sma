@@ -4,6 +4,7 @@
 #include <fakemeta>
 #include <fun>
 #include <hamsandwich>
+#include <dhudmessage>
 
 #define PLUGIN "Anticheat beta"
 #define VERSION "1.2b"
@@ -13,9 +14,12 @@
 //Bool if detected hack!
 new bool:g_bIsUserHacking [ 33 ][ 1 ];
 #define CHEAT_BHOP 0
-
+/*MUST REPAIR
+new Float:flSideMove[33] , Float:flForwardMove[33];
+*/
 //Frames
 new g_iFrames [ 33 ];
+new g_iFramesInAir [33];
 
 //Total bhops
 new g_iTotalBhops [ 33 ];
@@ -55,8 +59,52 @@ public plugin_init()
 	ac_punish = register_cvar( "ac_punish" , "1" ); //Slay - 1 || Kick - 2 || Default is 1
 
 	//RegisterHam ( Ham_Spawn , "player" , "client_spawn" , 1 );
+	//register_forward( FM_CmdStart , "fw_CmdStart" );
 }
+/* MUST REPAIR
+public fw_CmdStart ( id , uc_handle )
+{
+	new Float:flMaxSpeed;
+	pev ( id , pev_maxspeed , flMaxSpeed );
+	get_uc ( uc_handle , UC_SideMove , flSideMove[id] );
+	get_uc ( uc_handle , UC_ForwardMove , flForwardMove[id] );
 
+	new button = pev ( id , pev_button );
+	new oldbuttons = pev ( id , pev_oldbuttons );
+
+	set_dhudmessage( 250 , 0 , 0 , -1.0 , 0.25 , 0 , 0.2 , 0.4 , 0.1 , 0.1 );
+	show_dhudmessage( id , "Maxspeed & Sidemove & Forwardmove:^n%.2f   %.2f   %.2f" , flMaxSpeed , flSideMove[id] , flForwardMove[id] );
+
+	if ( button & IN_MOVELEFT && oldbuttons & IN_MOVELEFT )
+			client_print ( id , print_chat , "Your sidemove: %.2f" , flSideMove[id] )
+
+	if ( g_iFramesInAir[id] > 20 && is_user_alive(id) && is_user_connected(id) )
+	{
+		if ( button & IN_MOVELEFT && oldbuttons & IN_MOVELEFT || button & IN_MOVERIGHT && oldbuttons & IN_MOVERIGHT )
+			{
+				new Float:absflSideMove = floatabs ( flSideMove[id] );
+				if ( absflSideMove != flMaxSpeed )
+					{
+						new szName [32] , szSteamId [32];
+						get_user_name ( id , szName , charsmax(szName) );
+						get_user_authid ( id , szSteamId , charsmax(szSteamId) );
+						ColorChat ( 0 , "^1[^4Anti-cheat^1] Player %s(^4%s^1) is using strafe helper!" , szName , szSteamId );
+					}
+			}
+		if ( button & IN_FORWARD && oldbuttons & IN_FORWARD || button & IN_BACK && oldbuttons & IN_BACK )
+			{
+				new Float:absflForwardMove = floatabs ( flForwardMove[id] );
+				if ( absflForwardMove != flMaxSpeed )
+					{
+							new szName [32] , szSteamId [32];
+							get_user_name ( id , szName , charsmax(szName) );
+							get_user_authid ( id , szSteamId , charsmax(szSteamId) );
+							ColorChat ( 0 , "^1[^4Anti-cheat^1] Player %s(^4%s^1) is using strafe helper!" , szName , szSteamId );
+					}
+			}
+	}
+}
+*/
 public client_connect ( id )
 {
 	if ( g_iMotdTotalBhops [id] != 0 ) g_iMotdTotalBhops [id] = 0;
@@ -66,7 +114,7 @@ public client_connect ( id )
 
 /*public client_spawn ( id )
 {
-	if ( g_bIsUserHacking [id][CHEAT_BHOP] ) fw_Punish (id);
+	
 }*/
 
 public fwMotd ( id , level , cid )
@@ -83,17 +131,17 @@ public fwMotd ( id , level , cid )
 	new players [ 32 ] , playercount , PlayerID;
 	get_players ( players , playercount );
 
-	for ( new i; i < playercount; i++ )
+	for ( new i = 0; i < playercount; i++ )
 		{
+			PlayerID = players [ i ];
 			//Create ratio!
-			new Float:flRatio = ( float (g_iMotdPerfectBhops [id]) + float (g_iMotdSemiPerfectBhops [id]) ) / float(g_iTotalBhops [id]) * 100;
+			new Float:flRatio = ( float (g_iMotdPerfectBhops [PlayerID]) + float (g_iMotdSemiPerfectBhops [PlayerID]) ) / float(g_iTotalBhops [PlayerID]) * 100;
 			//End & Continue
 			new szName [ 32 ] , szSteamId [ 32 ];
-			PlayerID = players [ i ];
 			get_user_name ( PlayerID , szName , charsmax(szName) );
 			get_user_authid ( PlayerID , szSteamId , charsmax(szSteamId) );
-			len += format ( motd [ len ] , 2047-len , "<tr><td>%s</td><td>%s</td><td>%i</td><td>%i</td><td>%i</td><td>%.2f%</td></tr>" , szName , szSteamId , g_iMotdPerfectBhops [id] , \
-			g_iMotdSemiPerfectBhops [id] , g_iMotdTotalBhops [id] , flRatio );
+			len += format ( motd [ len ] , 2047-len , "<tr><td>%s</td><td>%s</td><td>%i</td><td>%i</td><td>%i</td><td>%.2f%</td></tr>" , szName , szSteamId , g_iMotdPerfectBhops [PlayerID] , \
+			g_iMotdSemiPerfectBhops [PlayerID] , g_iMotdTotalBhops [PlayerID] , flRatio );
 		}
 	len += format ( motd [ len ] , 2047-len , "</table></body></html>" );
 
@@ -104,13 +152,19 @@ public client_PreThink ( id )
 {
 	new button = pev ( id , pev_button );
 	new oldbuttons = pev ( id , pev_oldbuttons );
+	new IsPlayerOnGround = pev ( id , pev_flags ) & FL_ONGROUND;
 	//Frame on ground
-	if ( pev ( id , pev_flags ) & FL_ONGROUND )
+	if ( IsPlayerOnGround )
 		g_iFrames [id]++;
 	else
 		g_iFrames [id] = 0;
 	//End
 
+	if ( !IsPlayerOnGround && !is_user_bot(id) && is_user_alive(id) && is_user_connected(id) )
+		g_iFramesInAir [id]++;
+	else
+		g_iFramesInAir [id] = 0;
+	
 	//Player speed
 	new Float:flVelocity [ 3 ] , Float:flPlayerSpeed;
 	pev ( id , pev_velocity , flVelocity );
@@ -120,13 +174,9 @@ public client_PreThink ( id )
 	//Detecting if player is bhoping & BHOP HACK DETECTING
 	if ( flPlayerSpeed > 50.0 && g_iFrames [id] <= 6 && button & IN_JUMP && ~oldbuttons & IN_JUMP && pev ( id , pev_flags ) & FL_ONGROUND )
 		{
-			//Count total bhops!---
-			g_iTotalBhops [id]++;
-			//Too for MOTD
-			g_iMotdTotalBhops [id]++;
-			//And for ratio
-			g_iRatioTotalBhops [id]++;
-			//End------------------
+			g_iTotalBhops [id]++;		//Count total bhops
+			g_iMotdTotalBhops [id]++;	//Too for MOTD
+			g_iRatioTotalBhops [id]++;	//And for ratio
 
 			//Detecting perfect bhops & semi-perfect bhops
 			if ( g_iFrames [id] == 1 && flPlayerSpeed < 400.0 )
