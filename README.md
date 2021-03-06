@@ -15,4 +15,4 @@ TBA:
 - speedhack
 
 
-![Cheaters page](https://i.imgur.com/T1ycqlN.jpg)
+![Cheaters page](https://i.imgur.com/uXkrzwz.jpg)
