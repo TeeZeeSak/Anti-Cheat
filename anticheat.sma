@@ -43,9 +43,15 @@ new g_iDetections[33];
 new g_iMaxFPS[33];
 new g_iCvarFPS[33];
 new g_iCurrFPS[33];
-
+new g_iCmdRate[33];
 #define MAXPERFECT 12
 #define MAXSEMIPERFECT 17
+
+//Speedhack
+#define FPS_TASK_ID 927560
+
+new g_fps[33][11];
+new g_i[33];
 //---------------
 //Start AC on new round
 new bool:g_bAntiCheat [33];
@@ -57,7 +63,6 @@ public plugin_init () {
 	register_forward ( FM_PlayerPreThink , "fw_PlayerPreThink" );
 	register_forward ( FM_PlayerPostThink , "fw_PlayerPostThink" );
 	RegisterHam ( Ham_Spawn , "player" , "fw_PlayerSpawn" , 1 );
-	register_event ( "DeathMsg" , "fw_DeathPlayer" , "a" );
 	
 	register_clcmd("say /anticheat", "fwAntiCheat", ADMIN_KICK);
 }
@@ -84,34 +89,6 @@ public fwAntiCheat(id){
 	menu_display(id, menu);
 	
 	return PLUGIN_HANDLED;
-	/*
-	new motd [ 1536 ] , len;
-	len = format ( motd , 1535 , "<html><head>\
-	</script><meta charset='windows-1250'>\
-	<style>body{font-family:'Calibri';background-color:rgba(21,21,21,255);width:auto;}");
-	len += format( motd [ len ], 1535 - len, "td:not(.extra){border-bottom:1px #bbb solid;background-color:rgba(255,255,255,0.8);text-align:center;}tr:nth-child(1){background-color:rgba(150,0,0,0.8);}tr:nth-child(even)\
-	{background-color: rgba(25,25,25,0.1);}table{border-spacing:0;}");
-	len += format( motd [ len ], 1535 - len, "table{border-spacing:0;}</style></head><body><h1 style='color:white;'>Anticheat</h1>\
-	<table style='width:100&#37;'>" );
-	len += format ( motd [ len ] , 1535-len , "<tr><th>Nickname</th><th>SteamID</th><th>Perfect Bhops</th><th>Semi-perfect Bhops</th><th>Total Bhops</th><th>Ratio</th><th>Detections</th></tr>" );
-	new players [ 32 ] , playercount , PlayerID;
-	get_players ( players , playercount );
-	for ( new i = 0; i < playercount; i++ )
-		{
-			PlayerID = players [ i ];
-			//Create ratio!
-			new Float:flRatio = ( float (g_iMotdBhop [PlayerID][FOG1]) + float (g_iMotdBhop [PlayerID][FOG2]) ) / float(g_iTotalBhop  [PlayerID][MOTD]) * 100;
-			//End & Continue
-			new szName [ 32 ] , szSteamId [ 32 ];
-			get_user_name ( PlayerID , szName , charsmax(szName) );
-			get_user_authid ( PlayerID , szSteamId , charsmax(szSteamId) );
-			len += format ( motd [ len ] , 1535-len , "<tr><td>%s</td><td>%s</td><td>%i</td><td>%i</td><td>%i</td><td>%.2f%</td><td>%i</td></tr>" , szName , szSteamId , g_iMotdBhop [PlayerID][FOG1],\
-			g_iMotdBhop [PlayerID][FOG2] , g_iTotalBhop [RATIO], flRatio, g_iDetections[PlayerID], PlayerID, PlayerID );
-			
-		}
-	len += format ( motd [ len ] ,1535-len , "</table></body></html>" );
-	
-	show_motd(id, motd, "Anti-Cheat");*/
 }
 
 public hAntiCheat(id, menu, item){
@@ -136,12 +113,13 @@ public hAntiCheat(id, menu, item){
 public AntiCheatPlayer(info[], task_id){
 	new PlayerID = info[1];
 	new CallerID = info[0];
-	
+	query_client_cvar(PlayerID, "fps_max", "check_fps_max");
+
 	new szNick[32], AuthID[64], IP[16];
 	get_user_name(PlayerID, szNick, 32)
 	get_user_authid(PlayerID, AuthID, 63);
 	get_user_ip(PlayerID, IP, 15, 1);
-	new Float:flRatio = ( float (g_iMotdBhop [PlayerID][FOG1]) + float (g_iMotdBhop [PlayerID][FOG2]) ) / float(g_iTotalBhop  [PlayerID][MOTD]) * 100;
+	new Float:flRatio = ( float (g_iRatioBhop [PlayerID][FOG1]) + float (g_iRatioBhop [PlayerID][FOG2])) / float(g_iTotalBhop  [PlayerID][MOTD]) * 100;
 
 	new first[312], len;
 	new local = false;
@@ -192,9 +170,32 @@ public client_putinserver(id) {
 	g_bAntiCheat [id] = false;
 	g_iMaxFPS [id] = 0;
 	g_iCurrFPS[id] = 0;
+	
+	set_task(1.0, "resetCmdRate", id, "", 0, "b");
+	set_task(0.1, "count", FPS_TASK_ID + id, "", 0, "b");
+
 }
-public fw_DeathPlayer ( id ) {
+
+public client_disconnect(id) {
+	remove_task(FPS_TASK_ID + id);
 }
+
+public count(id) {
+	if ( g_i[id] < 9 )
+		g_i[id]++;
+	else
+		g_i[id] = 0;
+        
+	g_fps[id][g_i[id]] = g_fps[id][10];
+	g_fps[id][10] = 0;
+}
+
+public resetCmdRate(id){
+
+	g_iCmdRate[id] = 0;
+	
+}
+
 public fw_PlayerSpawn ( id ) {
 	g_bAntiCheat [id] = false;
 }
@@ -208,16 +209,28 @@ public check_fps_max(id, const szCvar, const szValue[]){
 public fw_CmdStart ( id , uc_handle ) {
 	if ( !is_user_alive(id) || is_user_bot(id) || pev ( id , pev_flags) & FL_FROZEN || pev ( id , pev_maxspeed ) < 150.0 || g_bBanned [id] || !g_bAntiCheat [id] )
 		return FMRES_IGNORED;
-	query_client_cvar(id, "fps_max", "check_fps_max");
+	
 	
 	get_uc ( uc_handle , UC_SideMove , g_flSideMove[id] );
 	get_uc ( uc_handle , UC_ForwardMove , g_flForwardMove[id] );
-	new Float:msec;
-	get_uc( uc_handle, UC_Msec, msec);
-	g_iCurrFPS[id] = floatround(1 / msec / 0.001);
+	
+	
+	g_iCmdRate[id]++;
+	
+	g_iCurrFPS[id] = get_user_fps(id);
+	
 	if(g_iCurrFPS[id] > g_iMaxFPS[id])
 		g_iMaxFPS[id] = g_iCurrFPS[id];
 	
+	
+	if(g_iCurrFPS[id] + 100 < g_iCmdRate[id]){
+		new name [32] , steamid [32];
+		get_user_name ( id , name , charsmax(name) );
+		get_user_authid ( id , steamid , charsmax(steamid) );
+		//g_bBanned [id] = true;
+		ColorChat ( 0 , "^1[^4Anti-Cheat^1] Player ^4%s^1(^4%s^1) is using speedhack! %i | %i" , name , steamid, g_iCurrFPS[id], g_iCmdRate[id]);
+		//g_iDetections[id] ++;
+	}
 	
 	return FMRES_IGNORED;
 }
@@ -336,6 +349,8 @@ public fw_PlayerPreThink ( id ) {
 	}
 	if ( !is_user_alive(id) || is_user_bot(id) || pev ( id , pev_maxspeed ) < 150.0 || g_bBanned [id] || !g_bAntiCheat [id] )
 		return FMRES_IGNORED;
+	g_fps[id][10]++;
+
 	new button = pev ( id , pev_button );
 	new oldbuttons = pev ( id , pev_oldbuttons );
 	g_OnGround [id] = pev ( id , pev_flags ) & FL_ONGROUND;
@@ -391,8 +406,7 @@ public fw_PlayerPreThink ( id ) {
 			g_iPerfectBhop [id][FOG2] = 0;
 			//For ratio
 			g_iRatioBhop [id][FOG1]++;
-			//For MOTD
-			g_iMotdBhop [id][FOG1]++;
+			
 		}
 		else if ( g_iFrames [id] == 2 ) {
 			//For detection perfects
@@ -400,8 +414,7 @@ public fw_PlayerPreThink ( id ) {
 			g_iPerfectBhop [id][FOG1] = 0;
 			//For ratio
 			g_iRatioBhop [id][FOG2]++;
-			//For MOTD
-			g_iMotdBhop [id][FOG2]++;
+		
 		}
 		else {
 			//For detection perfects
@@ -409,15 +422,14 @@ public fw_PlayerPreThink ( id ) {
 			g_iPerfectBhop [id][FOG2] = 0;
 			//For ratio
 			g_iRatioBhop [id][FOG3]++;
-			//For MOTD
-			g_iMotdBhop [id][FOG3]++;
+			
 		}
 	}
 	//Bhop by ratio
 	if ( g_iTotalBhop [id][RATIO] >= 60 )
 	{
-		new Float:flRatio = ( float(g_iMotdBhop[id][FOG1]) + float(g_iMotdBhop [id][FOG2]) ) / float(g_iTotalBhop [id][RATIO]) * 100;
-		if ( flRatio >= 95.0 )
+		new Float:flRatio = ( float(g_iRatioBhop[id][FOG1]) + float(g_iRatioBhop [id][FOG2])) / float(g_iTotalBhop [id][RATIO]) * 100;
+		if ( flRatio >= 99.0 )
 		{
 			
 			new szName [ 32 ] , szSteamId [ 32 ];
@@ -556,6 +568,19 @@ stock ColorChat(const id, const input[], any:...)
         } 
     } 
 }
+
+//Speedhack
+stock get_user_fps(id) 
+{
+    new i;
+    new j = 0;
+    
+    for ( i = 0 ; i < 9 ; i++ )
+        j += g_fps[id][i];
+    
+    return j - 5;
+} 
+
 /* AMXX-Studio Notes - DO NOT MODIFY BELOW HERE
 *{\\ rtf1\\ ansi\\ deff0{\\ fonttbl{\\ f0\\ fnil Tahoma;}}\n\\ viewkind4\\ uc1\\ pard\\ lang1029\\ f0\\ fs16 \n\\ par }
 */
