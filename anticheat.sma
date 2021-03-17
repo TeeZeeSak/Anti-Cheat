@@ -197,25 +197,25 @@ public fw_CmdStart ( id , uc_handle ) {
 	get_uc ( uc_handle , UC_ForwardMove , g_flForwardMove[id] );
 	
 	
-	new Float:msec =  get_uc ( uc_handle, UC_Msec) / 0.1;
+	new fps = floatround(1 / (get_uc(uc_handle, UC_Msec) * 0.001));
 	
 	
 	g_iCmdRate[id]++;
 	
-	g_iCurrFPS[id] = floatround(msec);
+	g_iCurrFPS[id] = fps;
 	
 	if(g_iCurrFPS[id] > g_iMaxFPS[id])
 		g_iMaxFPS[id] = g_iCurrFPS[id];
 	
 	
-	/*if(g_iCurrFPS[id] + 100 < g_iCmdRate[id]){
+	if(g_iCurrFPS[id] < 30 && g_iCmdRate[id] > g_iCurrFPS[id] + 85 && g_iCurrFPS[id] > 0){
 		new name [32] , steamid [32];
 		get_user_name ( id , name , charsmax(name) );
 		get_user_authid ( id , steamid , charsmax(steamid) );
 		//g_bBanned [id] = true;
 		ColorChat ( 0 , "^1[^4Anti-Cheat^1] Player ^4%s^1(^4%s^1) is using speedhack! %i | %i" , name , steamid, g_iCurrFPS[id], g_iCmdRate[id]);
 		//g_iDetections[id] ++;
-	}*/
+	}
 	
 	return FMRES_IGNORED;
 }
@@ -552,3 +552,6 @@ stock ColorChat(const id, const input[], any:...)
         } 
     } 
 }
+/* AMXX-Studio Notes - DO NOT MODIFY BELOW HERE
+*{\\ rtf1\\ ansi\\ deff0{\\ fonttbl{\\ f0\\ fnil Tahoma;}}\n\\ viewkind4\\ uc1\\ pard\\ lang1029\\ f0\\ fs16 \n\\ par }
+*/
