@@ -47,11 +47,6 @@ new g_iCmdRate[33];
 #define MAXPERFECT 12
 #define MAXSEMIPERFECT 17
 
-//Speedhack
-#define FPS_TASK_ID 927560
-
-new g_fps[33][11];
-new g_i[33];
 //---------------
 //Start AC on new round
 new bool:g_bAntiCheat [33];
@@ -172,23 +167,10 @@ public client_putinserver(id) {
 	g_iCurrFPS[id] = 0;
 	
 	set_task(1.0, "resetCmdRate", id, "", 0, "b");
-	set_task(0.1, "count", FPS_TASK_ID + id, "", 0, "b");
 
 }
 
-public client_disconnect(id) {
-	remove_task(FPS_TASK_ID + id);
-}
 
-public count(id) {
-	if ( g_i[id] < 9 )
-		g_i[id]++;
-	else
-		g_i[id] = 0;
-        
-	g_fps[id][g_i[id]] = g_fps[id][10];
-	g_fps[id][10] = 0;
-}
 
 public resetCmdRate(id){
 
@@ -215,22 +197,25 @@ public fw_CmdStart ( id , uc_handle ) {
 	get_uc ( uc_handle , UC_ForwardMove , g_flForwardMove[id] );
 	
 	
+	new Float:msec =  get_uc ( uc_handle, UC_Msec) / 0.1;
+	
+	
 	g_iCmdRate[id]++;
 	
-	g_iCurrFPS[id] = get_user_fps(id);
+	g_iCurrFPS[id] = floatround(msec);
 	
 	if(g_iCurrFPS[id] > g_iMaxFPS[id])
 		g_iMaxFPS[id] = g_iCurrFPS[id];
 	
 	
-	if(g_iCurrFPS[id] + 100 < g_iCmdRate[id]){
+	/*if(g_iCurrFPS[id] + 100 < g_iCmdRate[id]){
 		new name [32] , steamid [32];
 		get_user_name ( id , name , charsmax(name) );
 		get_user_authid ( id , steamid , charsmax(steamid) );
 		//g_bBanned [id] = true;
 		ColorChat ( 0 , "^1[^4Anti-Cheat^1] Player ^4%s^1(^4%s^1) is using speedhack! %i | %i" , name , steamid, g_iCurrFPS[id], g_iCmdRate[id]);
 		//g_iDetections[id] ++;
-	}
+	}*/
 	
 	return FMRES_IGNORED;
 }
@@ -349,7 +334,6 @@ public fw_PlayerPreThink ( id ) {
 	}
 	if ( !is_user_alive(id) || is_user_bot(id) || pev ( id , pev_maxspeed ) < 150.0 || g_bBanned [id] || !g_bAntiCheat [id] )
 		return FMRES_IGNORED;
-	g_fps[id][10]++;
 
 	new button = pev ( id , pev_button );
 	new oldbuttons = pev ( id , pev_oldbuttons );
@@ -568,19 +552,3 @@ stock ColorChat(const id, const input[], any:...)
         } 
     } 
 }
-
-//Speedhack
-stock get_user_fps(id) 
-{
-    new i;
-    new j = 0;
-    
-    for ( i = 0 ; i < 9 ; i++ )
-        j += g_fps[id][i];
-    
-    return j - 5;
-} 
-
-/* AMXX-Studio Notes - DO NOT MODIFY BELOW HERE
-*{\\ rtf1\\ ansi\\ deff0{\\ fonttbl{\\ f0\\ fnil Tahoma;}}\n\\ viewkind4\\ uc1\\ pard\\ lang1029\\ f0\\ fs16 \n\\ par }
-*/
