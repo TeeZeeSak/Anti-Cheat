@@ -47,6 +47,13 @@ new g_iCmdRate[33];
 #define MAXPERFECT 12
 #define MAXSEMIPERFECT 17
 
+new g_iFramesInAttack2[33];
+new Float:g_flTimeInAttack2[33];
+
+new g_iFramesInAttack[33];
+new Float:g_flTimeInAttack[33];
+
+
 //---------------
 //Start AC on new round
 new bool:g_bAntiCheat [33];
@@ -212,9 +219,31 @@ public fw_CmdStart ( id , uc_handle ) {
 		new name [32] , steamid [32];
 		get_user_name ( id , name , charsmax(name) );
 		get_user_authid ( id , steamid , charsmax(steamid) );
-		//g_bBanned [id] = true;
+		g_bBanned [id] = true;
 		ColorChat ( 0 , "^1[^4Anti-Cheat^1] Player ^4%s^1(^4%s^1) is using speedhack! %i | %i" , name , steamid, g_iCurrFPS[id], g_iCmdRate[id]);
-		//g_iDetections[id] ++;
+		g_iDetections[id] ++;
+	}
+	
+	new oldbuttons = pev ( id , pev_oldbuttons );
+	new button = pev ( id , pev_button );
+	if(button & IN_ATTACK2){
+		//add frames in attack2
+		g_iFramesInAttack2[id]++;
+		g_flTimeInAttack2[id] += get_uc(uc_handle, UC_Msec);
+	}else if(!(button & IN_ATTACK2) && oldbuttons & IN_ATTACK2){
+		client_print(id, print_chat, "Time in ATTACK2: %f (%i frames)", g_flTimeInAttack2[id], g_iFramesInAttack2[id]);
+		g_iFramesInAttack2[id] = 0;
+		g_flTimeInAttack2[id] = 0.0;
+	}
+	
+	if(button & IN_ATTACK){
+		//add frames in attack2
+		g_iFramesInAttack[id]++;
+		g_flTimeInAttack[id] += get_uc(uc_handle, UC_Msec);
+	}else if(!(button & IN_ATTACK) && oldbuttons & IN_ATTACK){
+		client_print(id, print_chat, "Time in ATTACK1: %f (%i frames)", g_flTimeInAttack[id], g_iFramesInAttack[id]);
+		g_iFramesInAttack[id] = 0;
+		g_flTimeInAttack[id] = 0.0;
 	}
 	
 	return FMRES_IGNORED;
