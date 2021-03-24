@@ -9,10 +9,11 @@ Scope:
 - Gstrafe (fog1-3)
 - Bhop ratio
 - Gstrafe ratio
+- speedhack
 
 TBA:
 - norecoil
-- speedhack
+- knifebot (in progress)
 
 
 ![Cheaters page](https://i.imgur.com/uXkrzwz.jpg)
