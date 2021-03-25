@@ -4,6 +4,8 @@
 #include <engine>
 #include <hamsandwich>
 #include <fun>
+#include <cstrike>
+
 //Banned?
 new bool:g_bBanned [33];
 //Flags
@@ -47,12 +49,10 @@ new g_iCmdRate[33];
 #define MAXPERFECT 12
 #define MAXSEMIPERFECT 17
 
-new g_iFramesInAttack2[33];
-new Float:g_flTimeInAttack2[33];
+//Knifebot
 
-new g_iFramesInAttack[33];
-new Float:g_flTimeInAttack[33];
-
+new g_iTotalKnife [33];
+new g_iKnifeTime[33];
 
 //---------------
 //Start AC on new round
@@ -226,25 +226,78 @@ public fw_CmdStart ( id , uc_handle ) {
 	
 	new oldbuttons = pev ( id , pev_oldbuttons );
 	new button = pev ( id , pev_button );
-	if(button & IN_ATTACK2){
-		//add frames in attack2
-		g_iFramesInAttack2[id]++;
-		g_flTimeInAttack2[id] += get_uc(uc_handle, UC_Msec);
-	}else if(!(button & IN_ATTACK2) && oldbuttons & IN_ATTACK2){
-		client_print(id, print_chat, "Time in ATTACK2: %f (%i frames)", g_flTimeInAttack2[id], g_iFramesInAttack2[id]);
-		g_iFramesInAttack2[id] = 0;
-		g_flTimeInAttack2[id] = 0.0;
+	new g_iFramesInAttack;
+	new Float:g_flTimeInAttack;
+	
+	new bInRadius = false;
+	new flClosest = 9999999;
+	
+	new players [ 32 ] , playercount , PlayerID;
+	get_players ( players , playercount );
+	
+	new CsTeams:gPlayerTeam = cs_get_user_team(id);
+	
+	for ( new i = 0; i < playercount; i++ )
+	{
+		PlayerID = players [ i ];
+		
+		if(!is_user_connected(PlayerID) || is_user_bot(PlayerID) || !is_user_alive(PlayerID))
+			continue;
+		if(cs_get_user_team(PlayerID) == gPlayerTeam || cs_get_user_team(PlayerID) & CS_TEAM_SPECTATOR || cs_get_user_team(PlayerID) & CS_TEAM_UNASSIGNED)
+			continue;
+			
+		new enemyOrigin[3];
+		get_user_origin(PlayerID, enemyOrigin, 0);
+		new playerOrigin[3];
+		get_user_origin(id, playerOrigin, 0);
+		
+		new flDistance = get_distance(enemyOrigin, playerOrigin);
+		
+		if(flClosest >= flDistance)
+			flClosest = flDistance;
+		
 	}
 	
-	if(button & IN_ATTACK){
-		//add frames in attack2
-		g_iFramesInAttack[id]++;
-		g_flTimeInAttack[id] += get_uc(uc_handle, UC_Msec);
-	}else if(!(button & IN_ATTACK) && oldbuttons & IN_ATTACK){
-		client_print(id, print_chat, "Time in ATTACK1: %f (%i frames)", g_flTimeInAttack[id], g_iFramesInAttack[id]);
-		g_iFramesInAttack[id] = 0;
-		g_flTimeInAttack[id] = 0.0;
+	if(flClosest <= 100){
+		bInRadius = true;
 	}
+	
+	if(bInRadius){
+		if(button & IN_ATTACK2){
+			//add frames in attack2
+			g_iFramesInAttack++;
+			g_flTimeInAttack += get_uc(uc_handle, UC_Msec);
+		}else if(!(button & IN_ATTACK2) && oldbuttons & IN_ATTACK2){
+			g_iFramesInAttack = 0;
+			g_flTimeInAttack = 0.0;
+		}
+		
+		if(button & IN_ATTACK){
+			//add frames in attack2
+			g_iFramesInAttack++;
+			g_flTimeInAttack += get_uc(uc_handle, UC_Msec);
+		}else if(!(button & IN_ATTACK) && oldbuttons & IN_ATTACK){
+			g_iFramesInAttack = 0;
+			g_flTimeInAttack = 0.0;
+		}
+		
+		if(g_iFramesInAttack <= 50){
+			g_iTotalKnife[id]++;
+			g_iKnifeTime[id] += g_iFramesInAttack;
+		}
+	}
+	
+	if(g_iTotalKnife[id] >= 30){
+		new flRatio = g_iTotalKnife[id] / g_iKnifeTime[id];
+		if(flRatio >= 30 && flRatio <= 45){
+			//Cheat?
+			new name [32] , steamid [32];
+			get_user_name ( id , name , charsmax(name) );
+			get_user_authid ( id , steamid , charsmax(steamid) );
+			ColorChat(0, "^1[^4Anti-Cheat^1] Player ^4%s^1(^4%s^1) is using knifebot!", name , steamid);
+		}
+	}
+
 	
 	return FMRES_IGNORED;
 }
