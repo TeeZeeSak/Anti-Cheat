@@ -302,12 +302,17 @@ public fw_CmdStart ( id , uc_handle ) {
 	return FMRES_IGNORED;
 }
 public fw_PlayerPostThink ( id , uc_handle ) {
-	if ( !is_user_alive(id) || is_user_bot(id) || pev ( id , pev_flags) & FL_FROZEN || pev ( id , pev_maxspeed ) < 150.0 || g_bBanned [id] || !g_bAntiCheat [id] )
+	new Float:flVelocity[ 3 ];
+	pev ( id , pev_velocity , flVelocity );
+	new Float:flPlayerSpeed = floatsqroot( flVelocity[ 0 ] * flVelocity[ 0 ] + flVelocity[ 1 ] * flVelocity[ 1 ] );
+
+	if ( !is_user_alive(id) || is_user_bot(id) || pev ( id , pev_flags) & FL_FROZEN || pev ( id , pev_maxspeed ) < 150.0 || g_bBanned [id] || !g_bAntiCheat [id] || flPlayerSpeed < 50.01 )
 		return FMRES_IGNORED;
 	new Float:flMaxSpeed;
 	pev ( id , pev_maxspeed , flMaxSpeed );
 	new button = pev ( id , pev_button );
 	new oldbuttons = pev ( id , pev_oldbuttons );
+
 	//Checking by check limits
 	if ( g_flForwardMove[id] > flMaxSpeed || g_flSideMove[id] > flMaxSpeed || g_flForwardMove[id] < -flMaxSpeed || g_flSideMove[id] < -flMaxSpeed ) {
 		new name [32] , steamid [32];
@@ -414,7 +419,12 @@ public fw_PlayerPreThink ( id ) {
 			g_bAntiCheat [id] = true;
 		}
 	}
-	if ( !is_user_alive(id) || is_user_bot(id) || pev ( id , pev_maxspeed ) < 150.0 || g_bBanned [id] || !g_bAntiCheat [id] )
+
+	new Float:flVelocity[ 3 ];
+	pev ( id , pev_velocity , flVelocity );
+	new Float:flPlayerSpeed = floatsqroot( flVelocity[ 0 ] * flVelocity[ 0 ] + flVelocity[ 1 ] * flVelocity[ 1 ] );
+
+	if ( !is_user_alive(id) || is_user_bot(id) || pev ( id , pev_maxspeed ) < 150.0 || g_bBanned [id] || !g_bAntiCheat [id] || flPlayerSpeed < 50.01 )
 		return FMRES_IGNORED;
 
 	new button = pev ( id , pev_button );
@@ -455,9 +465,7 @@ public fw_PlayerPreThink ( id ) {
 		g_iMove [id][DOWN]++;
 	else
 		g_iMove [id][DOWN] = 0;
-	new Float:flVelocity[ 3 ];
-	pev ( id , pev_velocity , flVelocity );
-	new Float:flPlayerSpeed = floatsqroot( flVelocity[ 0 ] * flVelocity[ 0 ] + flVelocity[ 1 ] * flVelocity[ 1 ] );
+	
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	//Bhop detection
