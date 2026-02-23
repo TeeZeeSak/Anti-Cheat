@@ -592,14 +592,14 @@ stock HandleDetection(id, const detection[])
 		case 2:
 		{
 			new userid = get_user_userid(id);
-			server_cmd("kick #%d ^\"Anti-Cheat: %s^\"", userid, detection);
+			server_cmd("kick #%d ^"Anti-Cheat: %s^"", userid, detection);
 			server_exec();
 			g_bBanned[id] = true;
 		}
 		case 3:
 		{
 			new userid = get_user_userid(id);
-			server_cmd("amx_ban 0 #%d ^\"Anti-Cheat: %s^\"", userid, detection);
+			server_cmd("amx_ban 0 #%d ^"Anti-Cheat: %s^"", userid, detection);
 			server_exec();
 			g_bBanned[id] = true;
 		}
@@ -657,3 +657,4 @@ stock ColorChat(const id, const input[], any:...)
 /* AMXX-Studio Notes - DO NOT MODIFY BELOW HERE
 *{\\ rtf1\\ ansi\\ deff0{\\ fonttbl{\\ f0\\ fnil Tahoma;}}\n\\ viewkind4\\ uc1\\ pard\\ lang1029\\ f0\\ fs16 \n\\ par }
 */
+
