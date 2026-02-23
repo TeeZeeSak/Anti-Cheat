@@ -121,7 +121,10 @@ public AntiCheatPlayer(info[], task_id){
 	get_user_name(PlayerID, szNick, 32)
 	get_user_authid(PlayerID, AuthID, 63);
 	get_user_ip(PlayerID, IP, 15, 1);
-	new Float:flRatio = ( float (g_iRatioBhop [PlayerID][FOG1]) + float (g_iRatioBhop [PlayerID][FOG2])) / float(g_iTotalBhop  [PlayerID][MOTD]) * 100;
+	new Float:flRatio = 0.0;
+	if (g_iTotalBhop[PlayerID][MOTD] > 0) {
+		flRatio = ( float (g_iRatioBhop [PlayerID][FOG1]) + float (g_iRatioBhop [PlayerID][FOG2])) / float(g_iTotalBhop  [PlayerID][MOTD]) * 100;
+	}
 
 	new first[312], len;
 	new local = false;
@@ -132,7 +135,7 @@ public AntiCheatPlayer(info[], task_id){
 	num_to_str(g_iCurrFPS[PlayerID], currFps, 9);
 	
 	len = format(first, 311, "\rAntiCheat^n^n\rNick: \d%s^n\rSteamID: \d%s^n\rIP: \d%s^n^n\yPerfect Hops: \d%i / %i^n\ySemi-Perfect Hops: \d%i / %i^n",szNick, AuthID, IP, g_iPerfectBhop[PlayerID][FOG1],g_iMotdBhop[PlayerID][FOG1], g_iPerfectBhop [PlayerID][FOG2], g_iMotdBhop[PlayerID][FOG2]);
-	len += format(first [ len ], 311, "\yTotal Bhops: \d%i^n\yRatio: \d%2.f^n\yDetections: \d%i^n\yFPS: \d%s^n\yMax FPS: \d%i^n\yFPS Cvar: \d%i", g_iTotalBhop [RATIO],flRatio, g_iDetections[PlayerID], local ? "LOCAL" : currFps, g_iMaxFPS[PlayerID], g_iCvarFPS[PlayerID]); 
+	len += format(first [ len ], 311, "\yTotal Bhops: \d%i^n\yRatio: \d%2.f^n\yDetections: \d%i^n\yFPS: \d%s^n\yMax FPS: \d%i^n\yFPS Cvar: \d%i", g_iTotalBhop [PlayerID][MOTD],flRatio, g_iDetections[PlayerID], local ? "LOCAL" : currFps, g_iMaxFPS[PlayerID], g_iCvarFPS[PlayerID]); 
 	
 	
 	new menu = menu_create(first, "hAntiCheatPlayer");
@@ -168,6 +171,18 @@ public client_putinserver(id) {
 	g_iPerfectGstrafe [id][FOG2] = 0;
 	g_iPerfectGstrafe [id][FOG3] = 0;
 	g_iPerfectGstrafe [id][FOG4] = 0;
+	g_iTotalBhop [id][MOTD] = 0;
+	g_iTotalBhop [id][RATIO] = 0;
+	g_iPerfectBhop [id][FOG1] = 0;
+	g_iPerfectBhop [id][FOG2] = 0;
+	g_iRatioBhop [id][FOG1] = 0;
+	g_iRatioBhop [id][FOG2] = 0;
+	g_iRatioBhop [id][FOG3] = 0;
+	g_iMotdBhop [id][FOG1] = 0;
+	g_iMotdBhop [id][FOG2] = 0;
+	g_iDetections [id] = 0;
+	g_iTotalKnife [id] = 0;
+	g_iKnifeTime [id] = 0;
 	g_bBanned [id] = false;
 	g_bAntiCheat [id] = false;
 	g_iMaxFPS [id] = 0;
@@ -175,6 +190,11 @@ public client_putinserver(id) {
 	
 	set_task(1.0, "resetCmdRate", id, "", 0, "b");
 
+}
+
+public client_disconnected(id) {
+	remove_task(id);
+	remove_task(id + TASK_UPDATEMENU);
 }
 
 
