@@ -42,6 +42,7 @@ new g_iPerfectGstrafe [33][4];
 #define RATIO 1
 
 new g_iDetections[33];
+new g_iLastDetectionAt[33];
 new g_iMaxFPS[33];
 new g_iCvarFPS[33];
 new g_iCurrFPS[33];
@@ -57,6 +58,9 @@ new g_iKnifeTime[33];
 //---------------
 //Start AC on new round
 new bool:g_bAntiCheat [33];
+
+new g_pPunishmentMode;
+new g_pAlertNonAdmins;
 //---------------------
 #define TASK_UPDATEMENU 1554
 public plugin_init () {
@@ -65,8 +69,31 @@ public plugin_init () {
 	register_forward ( FM_PlayerPreThink , "fw_PlayerPreThink" );
 	register_forward ( FM_PlayerPostThink , "fw_PlayerPostThink" );
 	RegisterHam ( Ham_Spawn , "player" , "fw_PlayerSpawn" , 1 );
+	g_pPunishmentMode = register_cvar("ac_punishment", "1");
+	g_pAlertNonAdmins = register_cvar("ac_alert_non_admins", "0");
 	
 	register_clcmd("say /anticheat", "fwAntiCheat", ADMIN_KICK);
+}
+
+public plugin_cfg() {
+	new configsDir[128], configFile[192];
+	get_configsdir(configsDir, charsmax(configsDir));
+	formatex(configFile, charsmax(configFile), "%s/anticheat.cfg", configsDir);
+
+	if (!file_exists(configFile)) {
+		new file = fopen(configFile, "wt");
+		if (file) {
+			fprintf(file, "; Anti-Cheat configuration^n");
+			fprintf(file, "; ac_punishment: 0 = do nothing, 1 = alert, 2 = kick, 3 = kick through amx_ban^n");
+			fprintf(file, "ac_punishment 1^n");
+			fprintf(file, "; ac_alert_non_admins: 0 = only admins see alerts, 1 = all players see alerts^n");
+			fprintf(file, "ac_alert_non_admins 0^n");
+			fclose(file);
+		}
+	}
+
+	server_cmd("exec %s", configFile);
+	server_exec();
 }
 
 public fwAntiCheat(id){
@@ -121,7 +148,10 @@ public AntiCheatPlayer(info[], task_id){
 	get_user_name(PlayerID, szNick, 32)
 	get_user_authid(PlayerID, AuthID, 63);
 	get_user_ip(PlayerID, IP, 15, 1);
-	new Float:flRatio = ( float (g_iRatioBhop [PlayerID][FOG1]) + float (g_iRatioBhop [PlayerID][FOG2])) / float(g_iTotalBhop  [PlayerID][MOTD]) * 100;
+	new Float:flRatio = 0.0;
+	if (g_iTotalBhop[PlayerID][MOTD] > 0) {
+		flRatio = ( float (g_iRatioBhop [PlayerID][FOG1]) + float (g_iRatioBhop [PlayerID][FOG2])) / float(g_iTotalBhop  [PlayerID][MOTD]) * 100;
+	}
 
 	new first[312], len;
 	new local = false;
@@ -132,7 +162,7 @@ public AntiCheatPlayer(info[], task_id){
 	num_to_str(g_iCurrFPS[PlayerID], currFps, 9);
 	
 	len = format(first, 311, "\rAntiCheat^n^n\rNick: \d%s^n\rSteamID: \d%s^n\rIP: \d%s^n^n\yPerfect Hops: \d%i / %i^n\ySemi-Perfect Hops: \d%i / %i^n",szNick, AuthID, IP, g_iPerfectBhop[PlayerID][FOG1],g_iMotdBhop[PlayerID][FOG1], g_iPerfectBhop [PlayerID][FOG2], g_iMotdBhop[PlayerID][FOG2]);
-	len += format(first [ len ], 311, "\yTotal Bhops: \d%i^n\yRatio: \d%2.f^n\yDetections: \d%i^n\yFPS: \d%s^n\yMax FPS: \d%i^n\yFPS Cvar: \d%i", g_iTotalBhop [RATIO],flRatio, g_iDetections[PlayerID], local ? "LOCAL" : currFps, g_iMaxFPS[PlayerID], g_iCvarFPS[PlayerID]); 
+	len += format(first [ len ], 311, "\yTotal Bhops: \d%i^n\yRatio: \d%2.f^n\yDetections: \d%i^n\yFPS: \d%s^n\yMax FPS: \d%i^n\yFPS Cvar: \d%i", g_iTotalBhop [PlayerID][MOTD],flRatio, g_iDetections[PlayerID], local ? "LOCAL" : currFps, g_iMaxFPS[PlayerID], g_iCvarFPS[PlayerID]); 
 	
 	
 	new menu = menu_create(first, "hAntiCheatPlayer");
@@ -168,6 +198,19 @@ public client_putinserver(id) {
 	g_iPerfectGstrafe [id][FOG2] = 0;
 	g_iPerfectGstrafe [id][FOG3] = 0;
 	g_iPerfectGstrafe [id][FOG4] = 0;
+	g_iTotalBhop [id][MOTD] = 0;
+	g_iTotalBhop [id][RATIO] = 0;
+	g_iPerfectBhop [id][FOG1] = 0;
+	g_iPerfectBhop [id][FOG2] = 0;
+	g_iRatioBhop [id][FOG1] = 0;
+	g_iRatioBhop [id][FOG2] = 0;
+	g_iRatioBhop [id][FOG3] = 0;
+	g_iMotdBhop [id][FOG1] = 0;
+	g_iMotdBhop [id][FOG2] = 0;
+	g_iDetections [id] = 0;
+	g_iLastDetectionAt [id] = 0;
+	g_iTotalKnife [id] = 0;
+	g_iKnifeTime [id] = 0;
 	g_bBanned [id] = false;
 	g_bAntiCheat [id] = false;
 	g_iMaxFPS [id] = 0;
@@ -175,6 +218,12 @@ public client_putinserver(id) {
 	
 	set_task(1.0, "resetCmdRate", id, "", 0, "b");
 
+}
+
+public client_disconnected(id) {
+	g_iLastDetectionAt[id] = 0;
+	remove_task(id);
+	remove_task(id + TASK_UPDATEMENU);
 }
 
 
@@ -216,12 +265,7 @@ public fw_CmdStart ( id , uc_handle ) {
 	
 	
 	if(g_iCurrFPS[id] < 30 && g_iCmdRate[id] > g_iCurrFPS[id] + 85 && g_iCurrFPS[id] > 0){
-		new name [32] , steamid [32];
-		get_user_name ( id , name , charsmax(name) );
-		get_user_authid ( id , steamid , charsmax(steamid) );
-		g_bBanned [id] = true;
-		ColorChat ( 0 , "^1[^4Anti-Cheat^1] Player ^4%s^1(^4%s^1) is using speedhack! %i | %i" , name , steamid, g_iCurrFPS[id], g_iCmdRate[id]);
-		g_iDetections[id] ++;
+		HandleDetection(id, "speedhack");
 	}
 	
 	new oldbuttons = pev ( id , pev_oldbuttons );
@@ -287,14 +331,10 @@ public fw_CmdStart ( id , uc_handle ) {
 		}
 	}
 	
-	if(g_iTotalKnife[id] >= 30){
+	if(g_iTotalKnife[id] >= 30 && g_iKnifeTime[id] > 0){
 		new flRatio = g_iTotalKnife[id] / g_iKnifeTime[id];
 		if(flRatio >= 30 && flRatio <= 45){
-			//Cheat?
-			new name [32] , steamid [32];
-			get_user_name ( id , name , charsmax(name) );
-			get_user_authid ( id , steamid , charsmax(steamid) );
-			ColorChat(0, "^1[^4Anti-Cheat^1] Player ^4%s^1(^4%s^1) is using knifebot!", name , steamid);
+			HandleDetection(id, "knifebot");
 		}
 	}
 
@@ -315,53 +355,28 @@ public fw_PlayerPostThink ( id , uc_handle ) {
 
 	//Checking by check limits
 	if ( g_flForwardMove[id] > flMaxSpeed || g_flSideMove[id] > flMaxSpeed || g_flForwardMove[id] < -flMaxSpeed || g_flSideMove[id] < -flMaxSpeed ) {
-		new name [32] , steamid [32];
-		get_user_name ( id , name , charsmax(name) );
-		get_user_authid ( id , steamid , charsmax(steamid) );
-		g_bBanned [id] = true;
-		ColorChat ( 0 , "^1[^4Anti-Cheat^1] Player ^4%s^1(^4%s^1) is using strafehack! (0x0001x0)" , name , steamid , g_flForwardMove[id] , g_flSideMove[id] , flMaxSpeed );
-		g_iDetections[id] ++;
+		HandleDetection(id, "strafehack (0x0001x0)");
 	}
 	//----------------------------------------------------------------------------------------------------------------------
 	//Checking by values of other button what is not pressed
 	if ( g_iMove [id][LEFT] > 2 && !g_bStrafeMod [id] && button & IN_MOVELEFT && oldbuttons & IN_MOVELEFT && !(button & IN_FORWARD) && !(button & IN_BACK) ) {
 		if ( g_flForwardMove[id] != 0.0 ) {
-			new name [32] , steamid [32];
-			get_user_name ( id , name , charsmax(name) );
-			get_user_authid ( id , steamid , charsmax(steamid) );
-			g_bBanned [id] = true;
-			g_iDetections[id] ++;
-			ColorChat ( 0 , "^1[^4Anti-Cheat^1] Player ^4%s^1(^4%s^1) is using strafehack! (0x0002x0)" , name , steamid );
+			HandleDetection(id, "strafehack (0x0002x0)");
 		}
 	}
 	if ( g_iMove [id][RIGHT] > 2 && !g_bStrafeMod [id] && button & IN_MOVERIGHT && oldbuttons & IN_MOVERIGHT && !(button & IN_FORWARD) && !(button & IN_BACK) ) {
 		if ( g_flForwardMove[id] != 0.0 ) {
-			new name [32] , steamid [32];
-			get_user_name ( id , name , charsmax(name) );
-			get_user_authid ( id , steamid , charsmax(steamid) );
-			g_bBanned [id] = true;
-			g_iDetections[id] ++;
-			ColorChat ( 0 , "^1[^4Anti-Cheat^1] Player ^4%s^1(^4%s^1) is using strafehack! (0x0002x1)" , name , steamid );
+			HandleDetection(id, "strafehack (0x0002x1)");
 		}
 	}
 	if ( g_iMove [id][UP] > 2 && !g_bStrafeMod [id] && button & IN_FORWARD && oldbuttons & IN_FORWARD && !(button & IN_MOVELEFT) && !(button & IN_MOVERIGHT) ) {
 		if ( g_flSideMove[id] != 0.0 ) {
-			new name [32] , steamid [32];
-			get_user_name ( id , name , charsmax(name) );
-			get_user_authid ( id , steamid , charsmax(steamid) );
-			g_bBanned [id] = true;
-			g_iDetections[id] ++;
-			ColorChat ( 0 , "^1[^4Anti-Cheat^1] Player ^4%s^1(^4%s^1) is using strafehack! (0x0002x2)" , name , steamid );
+			HandleDetection(id, "strafehack (0x0002x2)");
 		}
 	}
 	if ( g_iMove [id][DOWN] > 2 && !g_bStrafeMod [id] && button & IN_BACK && oldbuttons & IN_BACK && !(button & IN_MOVELEFT) && !(button & IN_MOVERIGHT) ) {
 		if ( g_flSideMove[id] != 0.0 ) {
-			new name [32] , steamid [32];
-			get_user_name ( id , name , charsmax(name) );
-			get_user_authid ( id , steamid , charsmax(steamid) );
-			g_bBanned [id] = true;
-			g_iDetections[id] ++;
-			ColorChat ( 0 , "^1[^4Anti-Cheat^1] Player ^4%s^1(^4%s^1) is using strafehack! (0x0002x3)" , name , steamid );
+			HandleDetection(id, "strafehack (0x0002x3)");
 		}
 	}
 	//----------------------------------------------------------------------------------------------------------------------
@@ -369,45 +384,25 @@ public fw_PlayerPostThink ( id , uc_handle ) {
 	if ( !g_bStrafeMod[id] && g_iMove [id][LEFT] > 3 && g_iMove [id][UP] > 2 && button & IN_MOVELEFT && button & IN_FORWARD && !(button & IN_BACK) && !(button & IN_MOVERIGHT) ) {
 		flMaxSpeed *= 0.7055;
 		if ( g_flSideMove [id] > -flMaxSpeed+2 || g_flSideMove [id] < -flMaxSpeed-2 || g_flForwardMove [id] > flMaxSpeed+2 || g_flForwardMove [id] < flMaxSpeed-2 ) {
-			new name [32] , steamid [32];
-			get_user_name ( id , name , charsmax(name) );
-			get_user_authid ( id , steamid , charsmax(steamid) );
-			g_bBanned [id] = true;
-			g_iDetections[id] ++;
-			ColorChat ( 0 , "^1[^4Anti-Cheat^1] Player ^4%s^1(^4%s^1) is using strafehelper! (0x0003x0)" , name , steamid );
+			HandleDetection(id, "strafehelper (0x0003x0)");
 		}
 	}
 	if ( !g_bStrafeMod [id] && g_iMove [id][RIGHT] > 3 && g_iMove [id][UP] > 2 && button & IN_MOVERIGHT && button & IN_FORWARD && !(button & IN_BACK) && !(button & IN_MOVELEFT) ) {
 		flMaxSpeed *= 0.7055;
 		if ( g_flSideMove [id] > flMaxSpeed+2 || g_flSideMove [id] < flMaxSpeed-2 || g_flForwardMove [id] > flMaxSpeed+2 || g_flForwardMove [id] < flMaxSpeed-2 ) {
-			new name [32] , steamid [32];
-			get_user_name ( id , name , charsmax(name) );
-			get_user_authid ( id , steamid , charsmax(steamid) );
-			g_bBanned [id] = true;
-			g_iDetections[id] ++;
-			ColorChat ( 0 , "^1[^4Anti-Cheat^1] Player ^4%s^1(^4%s^1) is using strafehelper! (0x0003x1)" , name , steamid );
+			HandleDetection(id, "strafehelper (0x0003x1)");
 		}
 	}
 	if ( !g_bStrafeMod [id] && g_iMove [id][LEFT] > 3 && g_iMove [id][DOWN] > 2 && button & IN_MOVELEFT && button & IN_BACK && !(button & IN_FORWARD) && !(button & IN_MOVERIGHT) ) {
 		flMaxSpeed *= 0.7055;
 		if ( g_flSideMove [id] > -flMaxSpeed+2 || g_flSideMove [id] < -flMaxSpeed-2 || g_flForwardMove [id] > -flMaxSpeed+2 || g_flForwardMove [id] < -flMaxSpeed-2 ) {
-			new name [32] , steamid [32];
-			get_user_name ( id , name , charsmax(name) );
-			get_user_authid ( id , steamid , charsmax(steamid) );
-			g_bBanned [id] = true;
-			g_iDetections[id] ++;
-			ColorChat ( 0 , "^1[^4Anti-Cheat^1] Player ^4%s^1(^4%s^1) is using strafehelper! (0x0003x2)" , name , steamid );
+			HandleDetection(id, "strafehelper (0x0003x2)");
 		}
 	}
 	if ( !g_bStrafeMod [id] && g_iMove [id][RIGHT] > 3 && g_iMove [id][DOWN] > 2 && button & IN_MOVERIGHT && button & IN_BACK && !(button & IN_FORWARD) && !(button & IN_MOVELEFT) ) {
 		flMaxSpeed *= 0.7055;
 		if ( g_flSideMove [id] > flMaxSpeed+2 || g_flSideMove [id] < flMaxSpeed-2 || g_flForwardMove [id] > -flMaxSpeed+2 || g_flForwardMove [id] < -flMaxSpeed-2 ) {
-			new name [32] , steamid [32];
-			get_user_name ( id , name , charsmax(name) );
-			get_user_authid ( id , steamid , charsmax(steamid) );
-			g_bBanned [id] = true;
-			g_iDetections[id] ++;
-			ColorChat ( 0 , "^1[^4Anti-Cheat^1] Player ^4%s^1(^4%s^1) is using strafehelper! (0x0003x3)" , name , steamid );
+			HandleDetection(id, "strafehelper (0x0003x3)");
 		}
 	}
 	//----------------------------------------------------------------------------------------------------------------------
@@ -505,13 +500,7 @@ public fw_PlayerPreThink ( id ) {
 		new Float:flRatio = ( float(g_iRatioBhop[id][FOG1]) + float(g_iRatioBhop [id][FOG2])) / float(g_iTotalBhop [id][RATIO]) * 100;
 		if ( flRatio >= 99.0 )
 		{
-			
-			new szName [ 32 ] , szSteamId [ 32 ];
-			get_user_name ( id , szName , charsmax(szName) );
-			get_user_authid ( id , szSteamId , charsmax(szSteamId) );
-			ColorChat(0, "^3[^4Anti-Cheat^3]^1 %s (^4%s^1) is using bhop hack!", szName, szSteamId);
-			g_iDetections[id] ++;
-			g_bBanned[id] = true;
+			HandleDetection(id, "bhop hack");
 		}
 		g_iTotalBhop [id][RATIO] = 0;
 	}
@@ -520,28 +509,14 @@ public fw_PlayerPreThink ( id ) {
 	//Detect if player reached MAXPERFECT ( 12 ) perfect bhops.
 	if ( g_iPerfectBhop [id] [FOG1] >= MAXPERFECT )
 	{
-			
-	
-		new szName [ 32 ] , szSteamId [ 32 ];
-		get_user_name ( id , szName , charsmax(szName) );
-		get_user_authid ( id , szSteamId , charsmax(szSteamId) );
-		ColorChat(0, "^3[^4Anti-Cheat^3]^1 %s (^4%s^1) is using bhop hack!", szName, szSteamId);
-		g_iDetections[id] ++;
-		g_bBanned[id] = true;
+		HandleDetection(id, "bhop hack");
 
 	}
 	
 	//Detect if player reached MAXSEMIPERFECT ( 17 ) perfect bhops.
 	if ( g_iPerfectBhop [id] [FOG2] >= MAXSEMIPERFECT )
 	{
-		
-
-		new szName [ 32 ] , szSteamId [ 32 ];
-		get_user_name ( id , szName , charsmax(szName) );
-		get_user_authid ( id , szSteamId , charsmax(szSteamId) );
-		ColorChat(0, "^3[^4Anti-Cheat^3]^1 %s (^4%s^1) is using bhop hack!", szName, szSteamId);
-		g_iDetections[id] ++;
-		g_bBanned[id] = true;
+		HandleDetection(id, "bhop hack");
 	
 	}
 
@@ -564,16 +539,7 @@ public fw_PlayerPreThink ( id ) {
 		}
 			
 		if (  g_iPerfectGstrafe [ id ] [FOG1] >= MAXPERFECT || g_iPerfectGstrafe [ id ] [FOG2] >= MAXSEMIPERFECT ) {
-			new name [ 64 ], steamid [ 64 ];
-			get_user_name ( id, name, charsmax(name) );
-			get_user_authid ( id, steamid, charsmax(steamid) );
-			
-			ColorChat(0, "^3[^4Anti-Cheat^3]^1 %s (^4%s^1) is using groundstrafe hack!", name, steamid);
-			g_bBanned[id] = true;
-
-			g_iDetections[id]++;
-					
-			
+			HandleDetection(id, "groundstrafe hack");
 		}
 	}
 	
@@ -593,16 +559,7 @@ public fw_PlayerPreThink ( id ) {
 			new Float:g_Result = ( g_iPerfectGstrafe [ id ] [FOG1] + g_iPerfectGstrafe  [ id ] [FOG2] ) / float( g_iGstrafeRatio) * 100;
 				
 			if ( g_Result >= 95 ) {
-				new name [ 32 ], steamid [ 32 ], ip [ 32 ];
-				get_user_name ( id, name, charsmax(name) );
-				get_user_authid ( id, steamid, charsmax(steamid) );
-				get_user_ip ( id, ip, charsmax(ip), 0 );
-			
-				ColorChat(0, "^3[^4Anti-Cheat^3]^1 %s (^4%s^1) is using groundstrafe hack!", name, steamid);
-				
-				g_iDetections[id]++;
-				
-				g_bBanned[id] = true;
+				HandleDetection(id, "groundstrafe hack");
 			}
 			g_iPerfectGstrafe [ id ] [FOG1] = 0;
 			g_iPerfectGstrafe [ id ] [FOG2] = 0;
@@ -618,6 +575,63 @@ public fw_PlayerPreThink ( id ) {
 	//-----------------//
 	return FMRES_IGNORED;
 }
+
+stock HandleDetection(id, const detection[])
+{
+	if (!is_user_connected(id))
+		return;
+
+	new now = get_systime(0);
+	if (now - g_iLastDetectionAt[id] < 3)
+		return;
+	g_iLastDetectionAt[id] = now;
+
+	g_iDetections[id]++;
+	AnnounceDetection(id, detection);
+
+	switch (get_pcvar_num(g_pPunishmentMode))
+	{
+		case 2:
+		{
+			new userid = get_user_userid(id);
+			server_cmd("kick #%d ^\"Anti-Cheat: %s^\"", userid, detection);
+			server_exec();
+			g_bBanned[id] = true;
+		}
+		case 3:
+		{
+			new userid = get_user_userid(id);
+			server_cmd("amx_ban 0 #%d ^\"Anti-Cheat: %s^\"", userid, detection);
+			server_exec();
+			g_bBanned[id] = true;
+		}
+	}
+}
+
+stock AnnounceDetection(id, const detection[])
+{
+	new name[32], steamid[32];
+	get_user_name(id, name, charsmax(name));
+	get_user_authid(id, steamid, charsmax(steamid));
+
+	new message[191];
+	formatex(message, charsmax(message), "^1[^4Anti-Cheat^1] Player ^4%s^1(^4%s^1) is using %s!", name, steamid, detection);
+
+	if (get_pcvar_num(g_pAlertNonAdmins)) {
+		ColorChat(0, message);
+		return;
+	}
+
+	new players[32], count;
+	get_players(players, count, "ch");
+	for (new i = 0; i < count; i++) {
+		new player = players[i];
+		if (get_user_flags(player) & ADMIN_KICK) {
+			ColorChat(player, message);
+		}
+	}
+}
+
 stock ColorChat(const id, const input[], any:...) 
 { 
     new count = 1, players[32] 
