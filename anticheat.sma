@@ -208,7 +208,6 @@ public client_putinserver(id) {
 	g_iMotdBhop [id][FOG1] = 0;
 	g_iMotdBhop [id][FOG2] = 0;
 	g_iDetections [id] = 0;
-	g_iLastDetectionAt [id] = 0;
 	g_iTotalKnife [id] = 0;
 	g_iKnifeTime [id] = 0;
 	g_bBanned [id] = false;
@@ -221,7 +220,6 @@ public client_putinserver(id) {
 }
 
 public client_disconnected(id) {
-	g_iLastDetectionAt[id] = 0;
 	remove_task(id);
 	remove_task(id + TASK_UPDATEMENU);
 }
